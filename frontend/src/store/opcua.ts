@@ -15,6 +15,9 @@ export const useOpcuaStore = defineStore('opcua', () => {
   // 当前用户角色，默认访客（仅查看）
   const currentRole = ref<Role>('visitor')
 
+  // Store 创建时立即初始化节点树，确保首屏有内容可渲染
+  initNodeTree()
+
   // 初始化模拟节点树
   function initNodeTree() {
     nodeTree.value = [
@@ -283,8 +286,9 @@ export const useOpcuaStore = defineStore('opcua', () => {
     return true
   }
 
-  // 连接模拟
+  // 连接模拟（幂等）
   function connect() {
+    if (isConnected.value) return
     isConnected.value = true
     initNodeTree()
   }

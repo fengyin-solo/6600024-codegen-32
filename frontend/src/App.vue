@@ -173,7 +173,6 @@ const currentRole = computed<Role>({
 })
 
 function handleRoleChange(role: Role) {
-  store.setRole(role)
   ElMessage.info(`已切换为：${ROLE_LABELS[role]}`)
 }
 
