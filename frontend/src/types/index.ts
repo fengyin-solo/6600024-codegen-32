@@ -1,3 +1,34 @@
+// 用户角色
+export type Role = 'visitor' | 'operator'
+
+// 角色权限定义
+export interface RolePermission {
+  canSubscribe: boolean
+  canAcknowledgeAlarm: boolean
+  canClearAlarms: boolean
+}
+
+// 角色与权限映射
+// 访客(visitor)：仅可查看数据
+// 运维人员(operator)：可订阅节点、确认报警、清空事件
+export const ROLE_PERMISSIONS: Record<Role, RolePermission> = {
+  visitor: {
+    canSubscribe: false,
+    canAcknowledgeAlarm: false,
+    canClearAlarms: false
+  },
+  operator: {
+    canSubscribe: true,
+    canAcknowledgeAlarm: true,
+    canClearAlarms: true
+  }
+}
+
+export const ROLE_LABELS: Record<Role, string> = {
+  visitor: '访客',
+  operator: '运维人员'
+}
+
 // OPC-UA 节点类型定义
 export interface OPCUANode {
   id: string

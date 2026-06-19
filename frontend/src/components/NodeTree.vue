@@ -72,14 +72,23 @@
       </el-descriptions>
 
       <div class="mt-3 flex gap-2">
-        <el-button
-          v-if="store.selectedNode.type === 'Variable'"
-          type="primary"
-          size="small"
-          @click="handleSubscribe"
+        <el-tooltip
+          :content="store.permissions.canSubscribe ? '' : '访客无权订阅节点，请切换为运维人员'"
+          :disabled="store.permissions.canSubscribe"
+          placement="top"
         >
-          {{ isSubscribed ? '取消订阅' : '订阅' }}
-        </el-button>
+          <span>
+            <el-button
+              v-if="store.selectedNode.type === 'Variable'"
+              type="primary"
+              size="small"
+              :disabled="!store.permissions.canSubscribe"
+              @click="handleSubscribe"
+            >
+              {{ isSubscribed ? '取消订阅' : '订阅' }}
+            </el-button>
+          </span>
+        </el-tooltip>
         <el-button
           v-if="store.selectedNode.type === 'Variable'"
           type="info"
@@ -118,6 +127,10 @@ function handleNodeClick(data: OPCUANode) {
 
 function handleSubscribe() {
   if (!store.selectedNode) return
+  if (!store.permissions.canSubscribe) {
+    ElMessage.warning('访客无权订阅节点，请切换为运维人员')
+    return
+  }
   if (isSubscribed.value) {
     store.removeSubscription(store.selectedNode.id)
     ElMessage.success(`已取消订阅: ${store.selectedNode.name}`)

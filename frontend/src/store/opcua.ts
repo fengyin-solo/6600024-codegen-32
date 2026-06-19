@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { OPCUANode, DataValue, AlarmEvent, SubscriptionConfig } from '../types'
+import type { OPCUANode, DataValue, AlarmEvent, SubscriptionConfig, Role, RolePermission } from '../types'
+import { ROLE_PERMISSIONS } from '../types'
 
 export const useOpcuaStore = defineStore('opcua', () => {
   // 状态
@@ -11,6 +12,8 @@ export const useOpcuaStore = defineStore('opcua', () => {
   const realTimeData = ref<Map<string, DataValue>>(new Map())
   const isConnected = ref(false)
   const dataHistory = ref<Map<string, Array<{ timestamp: number; value: number }>>>(new Map())
+  // 当前用户角色，默认访客（仅查看）
+  const currentRole = ref<Role>('visitor')
 
   // 初始化模拟节点树
   function initNodeTree() {
@@ -232,8 +235,17 @@ export const useOpcuaStore = defineStore('opcua', () => {
     selectedNode.value = node
   }
 
-  // 添加订阅
-  function addSubscription(nodeId: string, config: Partial<SubscriptionConfig> = {}) {
+  // 切换角色
+  function setRole(role: Role) {
+    currentRole.value = role
+  }
+
+  // 当前角色权限（计算属性）
+  const permissions = computed<RolePermission>(() => ROLE_PERMISSIONS[currentRole.value])
+
+  // 添加订阅（需要运维权限）
+  function addSubscription(nodeId: string, config: Partial<SubscriptionConfig> = {}): boolean {
+    if (!permissions.value.canSubscribe) return false
     const subscription: SubscriptionConfig = {
       nodeId,
       publishingInterval: config.publishingInterval || 1000,
@@ -243,24 +255,32 @@ export const useOpcuaStore = defineStore('opcua', () => {
       enabled: true
     }
     subscriptions.value.set(nodeId, subscription)
+    return true
   }
 
-  // 移除订阅
-  function removeSubscription(nodeId: string) {
+  // 移除订阅（需要运维权限）
+  function removeSubscription(nodeId: string): boolean {
+    if (!permissions.value.canSubscribe) return false
     subscriptions.value.delete(nodeId)
+    return true
   }
 
-  // 确认报警
-  function acknowledgeAlarm(alarmId: string) {
+  // 确认报警（需要运维权限）
+  function acknowledgeAlarm(alarmId: string): boolean {
+    if (!permissions.value.canAcknowledgeAlarm) return false
     const alarm = alarms.value.find(a => a.id === alarmId)
     if (alarm) {
       alarm.acknowledged = true
+      return true
     }
+    return false
   }
 
-  // 清空报警
-  function clearAlarms() {
+  // 清空报警（需要运维权限）
+  function clearAlarms(): boolean {
+    if (!permissions.value.canClearAlarms) return false
     alarms.value = []
+    return true
   }
 
   // 连接模拟
@@ -287,10 +307,12 @@ export const useOpcuaStore = defineStore('opcua', () => {
     realTimeData,
     isConnected,
     dataHistory,
+    currentRole,
     // 方法
     initNodeTree,
     simulateDataUpdate,
     selectNode,
+    setRole,
     addSubscription,
     removeSubscription,
     acknowledgeAlarm,
@@ -300,6 +322,7 @@ export const useOpcuaStore = defineStore('opcua', () => {
     getAllVariableNodes,
     // 计算属性
     activeAlarmsCount,
-    criticalAlarmsCount
+    criticalAlarmsCount,
+    permissions
   }
 })

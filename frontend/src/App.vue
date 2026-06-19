@@ -7,6 +7,23 @@
         <h1 class="app-title">OPC-UA 工业节点浏览与数据采集</h1>
       </div>
       <div class="header-right">
+        <!-- 角色切换 -->
+        <div class="role-switcher">
+          <el-icon :size="16" class="text-slate-400"><User /></el-icon>
+          <el-select
+            v-model="currentRole"
+            size="small"
+            class="role-select"
+            @change="handleRoleChange"
+          >
+            <el-option
+              v-for="opt in roleOptions"
+              :key="opt.value"
+              :label="opt.label"
+              :value="opt.value"
+            />
+          </el-select>
+        </div>
         <el-badge :value="store.activeAlarmsCount" :max="99" class="alarm-badge">
           <el-icon :size="20" class="text-yellow-400"><Bell /></el-icon>
         </el-badge>
@@ -45,9 +62,24 @@
         <div class="alarm-panel">
           <div class="alarm-header">
             <h3 class="text-lg font-bold text-yellow-400">报警事件</h3>
-            <el-button type="danger" size="small" text @click="store.clearAlarms()" v-if="store.alarms.length > 0">
-              清空
-            </el-button>
+            <el-tooltip
+              :content="store.permissions.canClearAlarms ? '' : '访客无权清空事件，请切换为运维人员'"
+              :disabled="store.permissions.canClearAlarms"
+              placement="top"
+            >
+              <span>
+                <el-button
+                  type="danger"
+                  size="small"
+                  text
+                  :disabled="!store.permissions.canClearAlarms"
+                  @click="handleClearAlarms"
+                  v-if="store.alarms.length > 0"
+                >
+                  清空
+                </el-button>
+              </span>
+            </el-tooltip>
           </div>
 
           <div class="alarm-stats">
@@ -82,15 +114,24 @@
                 <span class="alarm-node">{{ alarm.nodeName }}</span>
                 <p class="alarm-message">{{ alarm.message }}</p>
               </div>
-              <el-button
-                v-if="!alarm.acknowledged"
-                type="primary"
-                size="small"
-                text
-                @click="store.acknowledgeAlarm(alarm.id)"
+              <el-tooltip
+                :content="store.permissions.canAcknowledgeAlarm ? '' : '访客无权确认报警，请切换为运维人员'"
+                :disabled="store.permissions.canAcknowledgeAlarm"
+                placement="top"
               >
-                确认
-              </el-button>
+                <span>
+                  <el-button
+                    v-if="!alarm.acknowledged"
+                    type="primary"
+                    size="small"
+                    text
+                    :disabled="!store.permissions.canAcknowledgeAlarm"
+                    @click="handleAcknowledgeAlarm(alarm.id)"
+                  >
+                    确认
+                  </el-button>
+                </span>
+              </el-tooltip>
             </div>
 
             <div v-if="store.alarms.length === 0" class="no-alarms">
@@ -105,12 +146,13 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { Monitor, Bell, CircleCheck, CircleClose } from '@element-plus/icons-vue'
+import { Monitor, Bell, CircleCheck, CircleClose, User } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useOpcuaStore } from './store/opcua'
 import NodeTree from './components/NodeTree.vue'
 import DataDashboard from './components/DataDashboard.vue'
-import type { AlarmEvent } from './types'
+import type { AlarmEvent, Role } from './types'
+import { ROLE_LABELS } from './types'
 
 const store = useOpcuaStore()
 const updateTimer = ref<number | null>(null)
@@ -118,6 +160,41 @@ const updateTimer = ref<number | null>(null)
 const criticalCount = computed(() =>
   store.alarms.filter(a => a.severity === 'Critical' && !a.acknowledged).length
 )
+
+// 角色切换
+const roleOptions: Array<{ value: Role; label: string }> = (Object.keys(ROLE_LABELS) as Role[]).map(value => ({
+  value,
+  label: ROLE_LABELS[value]
+}))
+
+const currentRole = computed<Role>({
+  get: () => store.currentRole,
+  set: (val: Role) => store.setRole(val)
+})
+
+function handleRoleChange(role: Role) {
+  store.setRole(role)
+  ElMessage.info(`已切换为：${ROLE_LABELS[role]}`)
+}
+
+// 清空报警（受权限保护）
+function handleClearAlarms() {
+  if (!store.permissions.canClearAlarms) {
+    ElMessage.warning('访客无权清空事件，请切换为运维人员')
+    return
+  }
+  store.clearAlarms()
+  ElMessage.success('已清空报警事件')
+}
+
+// 确认报警（受权限保护）
+function handleAcknowledgeAlarm(alarmId: string) {
+  if (!store.permissions.canAcknowledgeAlarm) {
+    ElMessage.warning('访客无权确认报警，请切换为运维人员')
+    return
+  }
+  store.acknowledgeAlarm(alarmId)
+}
 
 function toggleConnection() {
   if (store.isConnected) {
@@ -214,6 +291,30 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+.role-switcher {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(71, 85, 105, 0.5);
+  border-radius: 6px;
+}
+
+.role-select {
+  width: 110px;
+}
+
+.role-select :deep(.el-input__wrapper) {
+  background: transparent;
+  box-shadow: none !important;
+}
+
+.role-select :deep(.el-input__inner) {
+  color: #e2e8f0;
+  font-size: 13px;
 }
 
 .status-tag {
